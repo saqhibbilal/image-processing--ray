@@ -2,3 +2,5 @@
 __pycache__/
 *.py[cod]
 output/
+test_images/
+*.egg-info/
