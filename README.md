@@ -71,11 +71,25 @@ python main.py --batch --input-dir ./images --output-dir ./blurred --resize 800x
 
 **Batch default:** If `--output-dir` is omitted, output is written to `./output`.
 
+## Phase 4 – Web UI
+
+Minimal black-and-white web interface (Quantico font). Upload images, set options, run the same pipeline, download results as a zip.
+
+```bash
+# From project root (after pip install -r requirements.txt && pip install -e .)
+python run_web.py
+# or
+python -m image_ray.web
+```
+
+Open **http://127.0.0.1:5000** in your browser. Upload images, choose resize/quality/format/filter, then click **Process**. The zip of processed images will download automatically.
+
 ## Project layout
 
 ```
 image-ray/
-  main.py              # Entrypoint: single-image or batch mode
+  main.py              # CLI: single-image or batch mode
+  run_web.py           # Run Phase 4 web UI
   requirements.txt
   README.md
   create_test_images.py
@@ -85,6 +99,7 @@ image-ray/
       image_ops.py     # Resize, quality, format conversion, filters (Pillow)
       ray_check.py     # Ray init + one remote task
       pipeline.py      # Chunking, Ray workers, aggregation
+      web.py           # Phase 4 Flask app
+      templates/
+        index.html     # Single-page UI (Quantico, black/white theme)
 ```
-
-Optional next: Phase 4 (minimal web UI).
