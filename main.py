@@ -3,17 +3,17 @@ Image-Ray: Parallel image processing pipeline with Ray.
 
 Phase 1: Single-image processing
 Phase 2: Batch processing (parallel pipeline)
+Phase 3: Full operations (resize, quality, format, filter) and CLI.
 
 Usage:
-  # Single image (Phase 1)
-  python main.py                    # Create test image and resize it
-  python main.py --input a.png --output b.png   # Resize your own image
-  
-  # Batch processing (Phase 2)
-  python main.py --batch --input-dir ./images --output-dir ./output --resize 800x600
-  
-  # Other options
-  python main.py --ray-check-only   # Only run Ray sanity check
+  # Single image
+  python main.py --input a.png --output b.png --resize 800x600 --format jpeg --quality 85
+
+  # Batch processing
+  python main.py --batch --input-dir ./images --output-dir ./output --resize 800x600 --format jpeg --filter grayscale
+
+  # Default batch output is ./output if --output-dir omitted
+  python main.py --batch --input-dir ./images --resize 400x300
 """
 
 import argparse
@@ -27,6 +27,10 @@ from image_ray import image_ops
 from image_ray import pipeline
 from image_ray import ray_check
 
+FILTER_CHOICES = [
+    "blur", "sharpen", "grayscale", "contour", "detail", "edge_enhance", "smooth", "smooth_more"
+]
+
 
 def parse_resize(resize_str: str) -> tuple:
     """Parse resize string like '800x600' into (width, height)."""
@@ -34,8 +38,22 @@ def parse_resize(resize_str: str) -> tuple:
         w, h = resize_str.lower().split("x")
         return (int(w), int(h))
     except ValueError:
-        print(f"Error: --resize must be in format WxH (e.g. 800x600)")
+        print("Error: --resize must be in format WxH (e.g. 800x600)")
         sys.exit(1)
+
+
+def build_ops(args: argparse.Namespace) -> dict:
+    """Build ops dict from CLI args for image_ops.process_image."""
+    ops = {
+        "resize": parse_resize(args.resize),
+        "resize_keep_aspect": getattr(args, "resize_keep_aspect", False),
+        "quality": args.quality,
+    }
+    if args.format:
+        ops["format"] = args.format
+    if args.filter:
+        ops["filter"] = args.filter
+    return ops
 
 
 def main():
@@ -43,9 +61,13 @@ def main():
     parser.add_argument("--input", "-i", help="Input image path (single-image mode)")
     parser.add_argument("--output", "-o", help="Output image path (single-image mode)")
     parser.add_argument("--input-dir", help="Input directory (batch mode)")
-    parser.add_argument("--output-dir", help="Output directory (batch mode, optional)")
+    parser.add_argument("--output-dir", help="Output directory (batch mode; default: ./output)")
     parser.add_argument("--batch", action="store_true", help="Enable batch processing mode")
     parser.add_argument("--resize", default="200x150", help="Target size WxH (default: 200x150)")
+    parser.add_argument("--resize-keep-aspect", action="store_true", help="Keep aspect ratio when resizing (thumbnail)")
+    parser.add_argument("--quality", type=int, default=95, help="JPEG/WebP quality 1-100 (default: 95)")
+    parser.add_argument("--format", choices=["jpeg", "jpg", "png", "webp", "gif", "bmp"], help="Output format (conversion)")
+    parser.add_argument("--filter", choices=FILTER_CHOICES, help="Apply filter: " + ", ".join(FILTER_CHOICES))
     parser.add_argument("--chunks", type=int, help="Number of chunks (default: CPU cores)")
     parser.add_argument("--ray-check-only", action="store_true", help="Only run Ray sanity check, then exit")
     args = parser.parse_args()
@@ -54,9 +76,7 @@ def main():
         ray_check.main()
         return
 
-    # Parse resize
-    resize_tuple = parse_resize(args.resize)
-    ops = {"resize": resize_tuple, "resize_keep_aspect": False}
+    ops = build_ops(args)
 
     # Batch mode (Phase 2)
     if args.batch or args.input_dir:
@@ -69,10 +89,11 @@ def main():
             print(f"Error: input directory not found: {input_dir}")
             sys.exit(1)
 
-        output_dir = Path(args.output_dir) if args.output_dir else None
+        output_dir = Path(args.output_dir) if args.output_dir else Path("output")
+        output_dir.mkdir(parents=True, exist_ok=True)
 
         print("=" * 60)
-        print("Phase 2: Parallel Batch Processing Pipeline")
+        print("Phase 3: Parallel Batch Pipeline (resize, quality, format, filter)")
         print("=" * 60)
         print()
 
@@ -98,7 +119,7 @@ def main():
 
     # Single-image mode (Phase 1)
     print("=" * 60)
-    print("Phase 1: Single-Image Processing")
+    print("Phase 3: Single-Image (resize, quality, format, filter)")
     print("=" * 60)
     print()
 
@@ -117,8 +138,11 @@ def main():
         image_ops.create_test_image(path_in, width=400, height=300)
 
     path_out = Path(args.output) if args.output else output_dir / "resized.png"
+    if args.format:
+        ext = image_ops._format_to_ext(args.format)
+        path_out = path_out.with_suffix(ext) if ext else path_out
 
-    print(f"Resizing {path_in} -> {path_out} to {args.resize}")
+    print(f"Processing {path_in} -> {path_out} (resize={args.resize}, quality={ops.get('quality')}, format={ops.get('format')}, filter={ops.get('filter')})")
     image_ops.process_image(path_in, path_out, ops)
     print(f"Done. Output: {path_out}")
 

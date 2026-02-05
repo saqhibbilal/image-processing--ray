@@ -20,63 +20,56 @@ pip install -e .  # Install package in editable mode (needed for Ray workers)
 
 ## Phase 1 – Single-image processing
 
-**Ray sanity check** – confirm Ray starts and runs a remote task:
+**Ray sanity check:**
 
 ```bash
 python -m image_ray.ray_check
 ```
 
-**Single-image resize** – process one image (creates a test image if none is provided):
+**Single-image processing** (creates a test image if no `--input`):
 
 ```bash
 python main.py
-```
-
-Or with your own image:
-
-```bash
-python main.py --input path\to\your\image.png --output path\to\output.png
+python main.py --input a.png --output b.jpg --resize 800x600 --format jpeg --quality 85 --filter grayscale
 ```
 
 ## Phase 2 – Parallel batch processing
 
-Process a directory of images in parallel using Ray workers:
+Process a directory of images in parallel:
 
 ```bash
-# Process all images in a directory
-python main.py --batch --input-dir ./images --output-dir ./output --resize 800x600
-
-# Overwrite originals (no --output-dir)
+python main.py --batch --input-dir ./images --output-dir ./out --resize 800x600
+# Default output directory is ./output if --output-dir is omitted
 python main.py --batch --input-dir ./images --resize 400x300
-
-# Control number of chunks (default: CPU cores)
-python main.py --batch --input-dir ./images --output-dir ./output --resize 800x600 --chunks 4
+python main.py --batch --input-dir ./images --output-dir ./out --chunks 4
 ```
 
-The pipeline will:
-1. Discover all images in the input directory
-2. Split them into chunks (one per CPU core by default)
-3. Process each chunk in parallel on Ray workers
-4. Aggregate results and report timing
+## Phase 3 – Full operations and CLI
 
-**Example output:**
+All operations (Pillow-only) are available in both single-image and batch mode.
+
+| Option | Description |
+|--------|-------------|
+| `--resize WxH` | Target size (default: 200x150) |
+| `--resize-keep-aspect` | Keep aspect ratio (thumbnail) |
+| `--quality N` | JPEG/WebP quality 1–100 (default: 95) |
+| `--format FORMAT` | Output format: jpeg, png, webp, gif, bmp |
+| `--filter NAME` | Filter: blur, sharpen, grayscale, contour, detail, edge_enhance, smooth, smooth_more |
+
+**Examples:**
+
+```bash
+# Single image: resize, convert to JPEG, compress, grayscale
+python main.py -i photo.png -o photo_small.jpg --resize 400x300 --format jpeg --quality 80 --filter grayscale
+
+# Batch: PNG folder -> JPEG output with resize and quality
+python main.py --batch --input-dir ./photos --output-dir ./export --resize 1200x800 --format jpeg --quality 90
+
+# Batch with filter
+python main.py --batch --input-dir ./images --output-dir ./blurred --resize 800x600 --filter blur
 ```
-============================================================
-Phase 2: Parallel Batch Processing Pipeline
-============================================================
 
-Discovering images in ./images...
-Found 20 images
-Split into 4 chunks (target: 4 chunks)
-Submitting 4 tasks to Ray workers...
-
-============================================================
-Pipeline Results:
-  Processed: 20 images
-  Failed: 0 images
-  Duration: 2.34 seconds
-============================================================
-```
+**Batch default:** If `--output-dir` is omitted, output is written to `./output`.
 
 ## Project layout
 
@@ -85,12 +78,13 @@ image-ray/
   main.py              # Entrypoint: single-image or batch mode
   requirements.txt
   README.md
+  create_test_images.py
   src/
     image_ray/
       __init__.py
-      image_ops.py     # Pillow-based image operations (resize)
+      image_ops.py     # Resize, quality, format conversion, filters (Pillow)
       ray_check.py     # Ray init + one remote task
-      pipeline.py      # Phase 2: chunking, Ray workers, aggregation
+      pipeline.py      # Chunking, Ray workers, aggregation
 ```
 
-Later phases add more operations (compress, format conversion, filtering), full CLI, and optional web UI.
+Optional next: Phase 4 (minimal web UI).
