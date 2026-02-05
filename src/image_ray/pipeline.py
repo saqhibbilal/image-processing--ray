@@ -127,7 +127,8 @@ def run_pipeline(
             'total_processed': 0,
             'total_failed': 0,
             'failed_paths': [],
-            'duration_seconds': 0.0
+            'duration_seconds': 0.0,
+            'num_chunks': 0,
         }
     print(f"Found {len(image_paths)} images")
 
@@ -165,5 +166,6 @@ def run_pipeline(
         'total_processed': total_processed,
         'total_failed': total_failed,
         'failed_paths': failed_paths,
-        'duration_seconds': duration
+        'duration_seconds': duration,
+        'num_chunks': len(chunks),
     }

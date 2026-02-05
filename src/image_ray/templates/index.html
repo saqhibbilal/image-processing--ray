@@ -165,6 +165,69 @@
     #status.processing { color: var(--text-muted); }
     #status.done { color: var(--text); }
     #status.error { color: #c00; }
+
+    .thumbs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .thumbs img {
+      width: 80px;
+      height: 80px;
+      object-fit: cover;
+      border: 1px solid var(--border);
+    }
+    .thumbs figcaption {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      max-width: 80px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .compare-section {
+      margin-top: 1.5rem;
+    }
+    .compare-section h2 { margin-bottom: 0.75rem; }
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    @media (max-width: 480px) { .compare-grid { grid-template-columns: 1fr; } }
+    .compare-box h3 {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin: 0 0 0.5rem 0;
+    }
+    .compare-box .thumbs { margin-bottom: 0; }
+    .batch-info {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+    }
+    .batch-info strong { color: var(--text); }
+    .btn-download {
+      display: inline-block;
+      font-family: 'Quantico', sans-serif;
+      font-weight: 700;
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.5rem 1rem;
+      text-decoration: none;
+      margin-top: 0.5rem;
+    }
+    .btn-download:hover { border-color: var(--accent); color: var(--accent); }
   </style>
 </head>
 <body>
@@ -176,6 +239,7 @@
       <h2>Upload</h2>
       <label for="images">Images (PNG, JPG, etc.)</label>
       <input type="file" id="images" name="images" accept=".png,.jpg,.jpeg,.gif,.bmp,.webp" multiple required>
+      <div id="input-previews" class="thumbs" aria-label="Input previews" style="display: none;"></div>
 
       <h2 style="margin-top: 1.5rem;">Options</h2>
       <div class="row">
@@ -223,12 +287,60 @@
     </form>
 
     <div id="status" role="status" aria-live="polite"></div>
+    <div id="result" class="compare-section" style="display: none;">
+      <div id="batch-info" class="batch-info"></div>
+      <div class="compare-grid">
+        <div class="compare-box">
+          <h3>Input</h3>
+          <div id="result-input" class="thumbs"></div>
+        </div>
+        <div class="compare-box">
+          <h3>Output</h3>
+          <div id="result-output" class="thumbs"></div>
+        </div>
+      </div>
+      <a id="download-btn" class="btn-download" href="#" style="display: none;">Download ZIP</a>
+    </div>
   </div>
 
   <script>
     const form = document.getElementById('form');
     const status = document.getElementById('status');
     const submitBtn = document.getElementById('submit');
+    const inputPreviews = document.getElementById('input-previews');
+    const resultSection = document.getElementById('result');
+    const batchInfo = document.getElementById('batch-info');
+    const resultInput = document.getElementById('result-input');
+    const resultOutput = document.getElementById('result-output');
+    const downloadBtn = document.getElementById('download-btn');
+
+    let lastInputUrls = [];
+
+    document.getElementById('images').addEventListener('change', function() {
+      const files = Array.from(this.files || []);
+      inputPreviews.style.display = 'none';
+      inputPreviews.innerHTML = '';
+      lastInputUrls = [];
+      if (files.length === 0) return;
+      resultSection.style.display = 'none';
+      files.forEach((file) => {
+        const reader = new FileReader();
+        reader.onload = function() {
+          lastInputUrls.push({ name: file.name, data: reader.result });
+          const fig = document.createElement('figure');
+          const img = document.createElement('img');
+          img.src = reader.result;
+          img.alt = '';
+          const cap = document.createElement('figcaption');
+          cap.textContent = file.name;
+          fig.appendChild(img);
+          fig.appendChild(cap);
+          inputPreviews.appendChild(fig);
+        };
+        reader.readAsDataURL(file);
+      });
+      inputPreviews.style.display = 'flex';
+    });
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -236,26 +348,46 @@
       submitBtn.disabled = true;
       status.className = 'processing';
       status.textContent = 'Processing…';
+      resultSection.style.display = 'none';
 
       try {
         const res = await fetch('/process', { method: 'POST', body: fd });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: res.statusText }));
-          throw new Error(err.error || 'Processing failed');
-        }
-        const count = res.headers.get('X-Processed-Count');
-        const duration = res.headers.get('X-Duration-Seconds');
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'image_ray_results.zip';
-        a.click();
-        URL.revokeObjectURL(url);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || res.statusText);
+
+        const n = data.total_processed;
+        const chunks = data.num_chunks;
+        const duration = data.duration_seconds;
+        batchInfo.innerHTML = 'Processed <strong>' + n + '</strong> image(s) in <strong>' + (chunks || '') + ' parallel chunk(s)</strong> in <strong>' + duration + 's</strong>.';
+        resultInput.innerHTML = '';
+        lastInputUrls.forEach(function(u) {
+          const fig = document.createElement('figure');
+          const img = document.createElement('img');
+          img.src = u.data;
+          img.alt = '';
+          const cap = document.createElement('figcaption');
+          cap.textContent = u.name;
+          fig.appendChild(img);
+          fig.appendChild(cap);
+          resultInput.appendChild(fig);
+        });
+        resultOutput.innerHTML = '';
+        (data.output_previews || []).forEach(function(p) {
+          const fig = document.createElement('figure');
+          const img = document.createElement('img');
+          img.src = p.data;
+          img.alt = '';
+          const cap = document.createElement('figcaption');
+          cap.textContent = p.name;
+          fig.appendChild(img);
+          fig.appendChild(cap);
+          resultOutput.appendChild(fig);
+        });
+        downloadBtn.href = '/download?token=' + encodeURIComponent(data.token);
+        downloadBtn.style.display = 'inline-block';
+        resultSection.style.display = 'block';
         status.className = 'done';
-        status.textContent = count
-          ? `Done. Processed ${count} image(s) in ${duration || '?'}s. Download started.`
-          : 'Done. Download started.';
+        status.textContent = 'Done. Compare input vs output below and download the ZIP if you want.';
       } catch (err) {
         status.className = 'error';
         status.textContent = err.message || 'Something went wrong.';
