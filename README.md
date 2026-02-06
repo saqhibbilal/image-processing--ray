@@ -11,17 +11,6 @@ Performance scales with available hardware. On a typical multi-core machine, pro
 - Python 3.9+ (tested on 3.9+)
 - Windows (or any OS supported by Ray)
 
-## Setup
-
-```bash
-cd image-ray
-python -m venv .venv
-.venv\Scripts\activate   # Windows
-# source .venv/bin/activate  # macOS/Linux
-pip install -r requirements.txt
-pip install -e .  # Install package in editable mode (needed for Ray workers)
-```
-
 ## Command Line Interface
 
 The CLI supports both single-image and batch processing modes. All operations use Pillow and are available in both modes.
@@ -73,21 +62,6 @@ python main.py --batch --input-dir ./photos --output-dir ./export --resize 1200x
 python main.py --batch --input-dir ./images --output-dir ./blurred --resize 800x600 --filter blur
 ```
 
-**Batch default:** If `--output-dir` is omitted, output is written to `./output`.
-
-## Web Interface
-
-Minimal black-and-white web interface (Quantico font) for interactive image processing. Upload multiple images, configure processing options, and see results with side-by-side input/output comparisons.
-
-```bash
-# From project root (after pip install -r requirements.txt && pip install -e .)
-python run_web.py
-# or
-python -m image_ray.web
-```
-
-Open **http://127.0.0.1:5000** in your browser. Upload images, choose resize/quality/format/filter, then click **Process**. Compare input vs output thumbnails and download the ZIP when ready.
-
 ![Web UI Upload Form](Screenshot%202026-02-06%20021718.jpg)
 
 The interface shows batching information—how many images were processed, how many parallel chunks were used, and execution time—along with thumbnail previews of both input and output images for easy comparison.
@@ -97,24 +71,3 @@ The interface shows batching information—how many images were processed, how m
 ![Web UI Input/Output Comparison](Screenshot%202026-02-06%20023736.jpg)
 
 ![Web UI Batch Processing](Screenshot%202026-02-06%20023845.jpg)
-
-## Project Layout
-
-```
-image-ray/
-  main.py              # CLI: single-image or batch mode
-  run_web.py           # Run web UI
-  requirements.txt
-  README.md
-  SETUP.md             # Detailed setup instructions
-  create_test_images.py
-  src/
-    image_ray/
-      __init__.py
-      image_ops.py     # Resize, quality, format conversion, filters (Pillow)
-      ray_check.py     # Ray init + one remote task
-      pipeline.py      # Chunking, Ray workers, aggregation
-      web.py           # Flask app
-      templates/
-        index.html     # Single-page UI (Quantico, black/white theme)
-```
