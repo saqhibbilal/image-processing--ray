@@ -22,7 +22,9 @@ pip install -r requirements.txt
 pip install -e .  # Install package in editable mode (needed for Ray workers)
 ```
 
-## Phase 1 – Single-image processing
+## Command Line Interface
+
+The CLI supports both single-image and batch processing modes. All operations use Pillow and are available in both modes.
 
 **Ray sanity check:**
 
@@ -37,9 +39,7 @@ python main.py
 python main.py --input a.png --output b.jpg --resize 800x600 --format jpeg --quality 85 --filter grayscale
 ```
 
-## Phase 2 – Parallel batch processing
-
-Process a directory of images in parallel. The pipeline automatically splits work into chunks and processes them concurrently:
+**Batch processing** - Process a directory of images in parallel. The pipeline automatically splits work into chunks and processes them concurrently:
 
 ![Batch Processing Results](Screenshot%202026-02-06%20020823.jpg)
 
@@ -50,17 +50,15 @@ python main.py --batch --input-dir ./images --resize 400x300
 python main.py --batch --input-dir ./images --output-dir ./out --chunks 4
 ```
 
-## Phase 3 – Full operations and CLI
+**Available options:**
 
-All operations (Pillow-only) are available in both single-image and batch mode.
-
-| Option | Description |
-|--------|-------------|
-| `--resize WxH` | Target size (default: 200x150) |
-| `--resize-keep-aspect` | Keep aspect ratio (thumbnail) |
-| `--quality N` | JPEG/WebP quality 1–100 (default: 95) |
-| `--format FORMAT` | Output format: jpeg, png, webp, gif, bmp |
-| `--filter NAME` | Filter: blur, sharpen, grayscale, contour, detail, edge_enhance, smooth, smooth_more |
+| Option                 | Description                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------ |
+| `--resize WxH`         | Target size (default: 200x150)                                                       |
+| `--resize-keep-aspect` | Keep aspect ratio (thumbnail)                                                        |
+| `--quality N`          | JPEG/WebP quality 1–100 (default: 95)                                                |
+| `--format FORMAT`      | Output format: jpeg, png, webp, gif, bmp                                             |
+| `--filter NAME`        | Filter: blur, sharpen, grayscale, contour, detail, edge_enhance, smooth, smooth_more |
 
 **Examples:**
 
@@ -75,9 +73,7 @@ python main.py --batch --input-dir ./photos --output-dir ./export --resize 1200x
 python main.py --batch --input-dir ./images --output-dir ./blurred --resize 800x600 --filter blur
 ```
 
-**Batch default:** If `--output-dir` is omitted, output is written to `./output`.
-
-## Phase 4 – Web UI
+## Web Interface
 
 Minimal black-and-white web interface (Quantico font) for interactive image processing. Upload multiple images, configure processing options, and see results with side-by-side input/output comparisons.
 
@@ -96,26 +92,4 @@ The interface shows batching information—how many images were processed, how m
 python run_web.py
 # or
 python -m image_ray.web
-```
-
-Open **http://127.0.0.1:5000** in your browser. Upload images, choose resize/quality/format/filter, then click **Process**. Compare input vs output thumbnails and download the ZIP when ready.
-
-## Project layout
-
-```
-image-ray/
-  main.py              # CLI: single-image or batch mode
-  run_web.py           # Run Phase 4 web UI
-  requirements.txt
-  README.md
-  create_test_images.py
-  src/
-    image_ray/
-      __init__.py
-      image_ops.py     # Resize, quality, format conversion, filters (Pillow)
-      ray_check.py     # Ray init + one remote task
-      pipeline.py      # Chunking, Ray workers, aggregation
-      web.py           # Phase 4 Flask app
-      templates/
-        index.html     # Single-page UI (Quantico, black/white theme)
 ```
